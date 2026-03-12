@@ -1,46 +1,49 @@
-# FINAL RELEASE TODO - v0.4.0 (All Merges Complete Locally)
+# FINAL RELEASE TODO - v0.4.0 ✅ READY FOR OWNER
 
-## Status
-- [x] All code integrations merged (Cloudflare/Alby/Netlify/AgentQL/JPM/Payroll/NestJS)
-- [x] 117/117 tests passing
-- [x] Git working tree clean
-- [x] npm @owlban/frog@0.3.0 published
-- [ ] PR #2 merged on ESADavid/tavily-mcp
-- [ ] Tag v0.4.0 pushed → CI/CD release
+## Current Status (Local Complete)
+| Task | Status |
+|------|--------|
+| Code integrations | ✅ All merged |
+| Tests | ✅ 117/117 passing |
+| Working tree | ✅ Clean |
+| Local commits | ✅ 4 ahead on main |
+| Permissions | ⚠️ Owner auth needed |
+| PR #2 merge | ⏳ Owner manual |
+| v0.4.0 tag/push | ⏳ Owner |
 
-## Steps Remaining (1/5 complete)
+## IMMEDIATE OWNER ACTIONS
 
-### 1. Switch to main [RUN NOW - Windows CMD]
+### 1. Fix Git Auth & Push Local Main
 ```
-git checkout main
-git pull origin main
+git remote set-url origin https://ESADavid:<YOUR_PAT>@github.com/ESADavid/tavily-mcp.git
+git push origin main
 ```
-**Or PowerShell:** `git checkout main; git pull origin main`
+**Or reconfigure credentials:** GitHub Desktop / VSCode Source Control / PAT setup.
 
-### 2. Merge feature branch locally (if needed)
+### 2. Merge PR #2 (Critical)
+- [PR #2](https://github.com/ESADavid/tavily-mcp/pull/2)
 ```
-git merge cloudflare-mcp-integration
-npm install  # Update lockfile if needed
-npm run build  # Verify build
+Merge pull request → Create merge commit → Delete source branch
 ```
 
-### 3. MANUAL: Owner merges PR #2
-- Go to https://github.com/ESADavid/tavily-mcp/pull/2
-- Click 'Merge pull request' → 'Create a merge commit'
-- Delete source branch after merge
-
-### 4. Tag & Push Release
+### 3. Release Tag
 ```
-git tag -a v0.4.0 -m \"Complete MCP integrations + NestJS JPM/Payroll (117/117 tests)\"
+git tag -a v0.4.0 -m "Complete MCP integrations + NestJS JPM/Payroll (117/117 tests)"
 git push origin v0.4.0
 ```
-Triggers `.github/workflows/release.yml` → auto npm publish.
 
-### 5. Verify
-- GitHub Releases: v0.4.0
-- npm: v0.4.0 published
-- Actions: Green workflow
+### Expected Results
+- 🎉 GitHub Release v0.4.0
+- 📦 npm publish @latest (0.4.0)
+- 🟢 CI/CD workflows green
 
-**Next:** Execute step 1, confirm, then proceed.
+## Verification Commands
+```bash
+npm test          # All tests
+npm run build     # TypeScript compile
+git status        # Clean tree
+```
 
-**Updated:** $(date)
+**No code changes needed. Repo is production-ready! 🚀**
+
+**Updated:** `date`
