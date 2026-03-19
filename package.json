@@ -19,7 +19,8 @@
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "dashboard:dev": "node build/dashboard-server.js"
   },
   "keywords": [
     "tavily-mcp",
@@ -47,13 +48,15 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
-    "dotenv": "^16.4.5",
     "axios": "^1.6.7",
-    "yargs": "^17.7.2",
-    "stripe": "^14.14.0"
+    "dotenv": "^16.4.5",
+    "stripe": "^14.14.0",
+    "ws": "^8.19.0",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
+    "@types/ws": "^8.18.1",
     "@types/yargs": "^17.0.32",
     "typescript": "^5.3.3"
   }

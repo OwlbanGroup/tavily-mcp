@@ -20,7 +20,7 @@ git push origin v0.4.0
 
 ### 2. Docker Production Image
 
-```
+```bash
 npm run build
 docker build -t tavily-mcp:latest .
 docker tag tavily-mcp:latest ghcr.io/ESADavid/tavily-mcp:latest
@@ -29,9 +29,9 @@ docker push ghcr.io/ESADavid/tavily-mcp:latest
 
 ### 3. Deploy Live Remote MCP Server (Cloud Run/Render/Fly.io)
 
-**Option A: Google Cloud Run (Recommended)**
+### Option A: Google Cloud Run (Recommended)
 
-```
+```bash
 gcloud run deploy tavily-mcp-prod \
   --image ghcr.io/ESADavid/tavily-mcp:latest \
   --platform managed \
@@ -40,7 +40,7 @@ gcloud run deploy tavily-mcp-prod \
   --set-env-vars "TAVILY_API_KEY=prod-key,STRIPE_SECRET_KEY=prod-key"
 ```
 
-**Option B: Render.com**
+### Option B: Render.com
 
 - Connect GitHub repo to Render
 - Docker runtime, auto-deploy on tag v0.4.0
@@ -48,20 +48,20 @@ gcloud run deploy tavily-mcp-prod \
 
 ### 4. Update Remote MCP URLs in README
 
-```
+```text
 https://mcp-prod.tavily-mcp.com/mcp/?tavilyApiKey=<key>
 ```
 
 ### 5. Verify Live Deployment
 
-```
+```bash
 curl "https://your-prod-url/mcp/health"
 npx @modelcontextprotocol/inspector https://your-prod-url
 ```
 
 ### 6. Monitor Production
 
-```
+```bash
 # Cloudflare Observability/Radar/Browser already integrated
 npm run metrics  # Local metrics endpoint
 ```
