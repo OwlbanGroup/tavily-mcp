@@ -24,6 +24,14 @@ import {
   CLOUDFLARE_MCP_SERVERS,
   listCloudflareServers
 } from './cloudflare.js';
+import {
+  getOAuthStartUrl,
+  exchangeAuthorizationCode
+} from './jpm/oauth.js';
+import {
+  getDashboardHealth,
+  getDashboardStatus
+} from './jpm/dashboard.js';
 
 dotenv.config();
 
@@ -626,6 +634,49 @@ class TavilyClient {
             required: ["service"]
           }
         },
+        {
+          name: "jpm_get_oauth_start_url",
+          description: "Generate JPMorgan OAuth authorization URL and state to initiate secure login from your dashboard backend.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              state: {
+                type: "string",
+                description: "Optional custom OAuth state value. If omitted, server generates one."
+              }
+            }
+          }
+        },
+        {
+          name: "jpm_exchange_oauth_code",
+          description: "Exchange JPMorgan OAuth authorization code for tokens. Requires JPM OAuth env vars to be configured.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              code: {
+                type: "string",
+                description: "OAuth authorization code returned by JPMorgan callback."
+              }
+            },
+            required: ["code"]
+          }
+        },
+        {
+          name: "jpm_dashboard_health",
+          description: "Get dashboard backend health state (server status, websocket state, env readiness).",
+          inputSchema: {
+            type: "object",
+            properties: {}
+          }
+        },
+        {
+          name: "jpm_dashboard_status",
+          description: "Get dashboard live-mode status payload for frontend placeholders (metrics loading/readiness).",
+          inputSchema: {
+            type: "object",
+            properties: {}
+          }
+        },
       ];
       return { tools };
     });
@@ -843,6 +894,60 @@ text: formatResearchResults(researchResponse)
               content: [{
                 type: "text",
                 text: formatCloudflareServerInfo(args.service)
+              }]
+            };
+
+          case "jpm_get_oauth_start_url":
+            try {
+              const start = getOAuthStartUrl(args.state);
+              return {
+                content: [{
+                  type: "text",
+                  text: JSON.stringify(start, null, 2)
+                }]
+              };
+            } catch (err: any) {
+              return {
+                content: [{
+                  type: "text",
+                  text: `JPM OAuth start URL error: ${err.message}`
+                }],
+                isError: true
+              };
+            }
+
+          case "jpm_exchange_oauth_code":
+            try {
+              const tokenResult = await exchangeAuthorizationCode(args.code);
+              return {
+                content: [{
+                  type: "text",
+                  text: JSON.stringify(tokenResult, null, 2)
+                }]
+              };
+            } catch (err: any) {
+              return {
+                content: [{
+                  type: "text",
+                  text: `JPM OAuth code exchange error: ${err.message}`
+                }],
+                isError: true
+              };
+            }
+
+          case "jpm_dashboard_health":
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(getDashboardHealth(), null, 2)
+              }]
+            };
+
+          case "jpm_dashboard_status":
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(getDashboardStatus(), null, 2)
               }]
             };
 

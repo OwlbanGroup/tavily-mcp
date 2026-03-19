@@ -3,7 +3,7 @@
 ## Current Status
 
 | Component | Status | URL |
-|-----------|--------|-----|
+| --- | --- | --- |
 | GitHub Release | ⏳ Pending tag push | <https://github.com/ESADavid/tavily-mcp/releases> |
 | npm Package | 0.2.17 → 0.4.0 ⏳ | <https://npmjs.com/package/tavily-mcp> |
 | Docker Image | ⏳ Pending build | ghcr.io/ESADavid/tavily-mcp |
