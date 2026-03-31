@@ -1,9 +1,14 @@
+<<<<<<< HEAD
 # Tavily MCP Server (Enhanced Edition)
+=======
+# Tavily MCP Server
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
 
 ![GitHub Repo stars](https://img.shields.io/github/stars/tavily-ai/tavily-mcp?style=social)
 ![npm](https://img.shields.io/npm/dt/tavily-mcp)
 ![smithery badge](https://smithery.ai/badge/@tavily-ai/tavily-mcp)
 
+<<<<<<< HEAD
 **Enhanced version with Advanced Caching, Rate Limiting, Comprehensive Logging & Production-Ready Features**
 
 ## ✨ Key Features
@@ -409,6 +414,18 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ### 📚 Helpful Resources
 
+=======
+The Tavily MCP server provides:
+
+- search, extract, map, crawl tools
+- Real-time web search capabilities through the tavily-search tool
+- Intelligent data extraction from web pages via the tavily-extract tool
+- Powerful web mapping tool that creates a structured map of website
+- Web crawler that systematically explores websites
+
+## Helpful Resources
+
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
 - [Tutorial](https://medium.com/@dustin_36183/building-a-knowledge-graph-assistant-combining-tavily-and-neo4j-mcp-servers-with-claude-db92de075df9) on combining Tavily MCP with Neo4j MCP server
 - [Tutorial](https://medium.com/@dustin_36183/connect-your-coding-assistant-to-the-web-integrating-tavily-mcp-with-cline-in-vs-code-5f923a4983d1) on integrating Tavily MCP with Cline in VS Code
 
@@ -418,15 +435,23 @@ Connect directly to Tavily's remote MCP server instead of running it locally. Th
 
 Simply use the remote MCP server URL with your Tavily API key:
 
+<<<<<<< HEAD
 ```
 https://mcp.tavily.com/mcp/?tavilyApiKey=<your-api-key> 
 ```
 
  Get your Tavily API key from [tavily.com](https://www.tavily.com/).
+=======
+```text
+https://mcp.tavily.com/mcp/?tavilyApiKey=<your-api-key>
+```
+
+Get your Tavily API key from [tavily.com](https://www.tavily.com/).
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
 
 Alternatively, you can pass your API key through an Authorization header if the MCP client supports this:
 
-```
+```text
 Authorization: Bearer <your-api-key>
 ```
 
@@ -440,7 +465,7 @@ Authorization: Bearer <your-api-key>
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's official CLI tool for Claude. You can add the Tavily MCP server using the `claude mcp add` command. There are two ways to authenticate:
 
-#### Option 1: API Key in URL
+### Option 1: API Key in URL
 
 Pass your API key directly in the URL. Replace `<your-api-key>` with your actual [Tavily API key](https://www.tavily.com/):
 
@@ -448,7 +473,7 @@ Pass your API key directly in the URL. Replace `<your-api-key>` with your actual
 claude mcp add --transport http tavily https://mcp.tavily.com/mcp/?tavilyApiKey=<your-api-key>
 ```
 
-#### Option 2: OAuth Authentication Flow
+### Option 2: OAuth Authentication Flow
 
 Add the server without an API key in the URL:
 
@@ -474,20 +499,29 @@ Once configured, you'll have access to the Tavily search, extract, map, and craw
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=tavily-remote-mcp&config=eyJjb21tYW5kIjoibnB4IC15IG1jcC1yZW1vdGUgaHR0cHM6Ly9tY3AudGF2aWx5LmNvbS9tY3AvP3RhdmlseUFwaUtleT08eW91ci1hcGkta2V5PiIsImVudiI6e319)
 
-Click the ⬆️ Add to Cursor ⬆️ button, this will do most of the work for you but you will still need to edit the configuration to add your API-KEY. You can get a Tavily API key [here](https://www.tavily.com/).
+Click the ⬆️ Add to Cursor ⬆️ button, this will do most of the work for you but you will still need to edit the configuration to add your API-KEY. You can get a Tavily API key by [signing up for a free account](https://www.tavily.com/).
 
+<<<<<<< HEAD
 once you click the button you should be redirect to Cursor ...
+=======
+Once you click the button you should be redirect to Cursor ...
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
 
 ### Step 1
 
 Click the install button
 
+<<<<<<< HEAD
 ![](assets/cursor-step1.png)
+=======
+![Cursor step 1](assets/cursor-step1.png)
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
 
 ### Step 2
 
 You should see the MCP is now installed, if the blue slide is not already turned on, manually turn it on. You also need to edit the configuration to include your own Tavily API key.
-![](assets/cursor-step2.png)
+
+![Cursor step 2](assets/cursor-step2.png)
 
 ### Step 3
 
@@ -514,12 +548,21 @@ The Tavily Remote MCP server supports secure OAuth authentication, allowing you 
 
 - Open the MCP Inspector and click "Open Auth Settings".
 - Select the OAuth flow and complete these steps:
+<<<<<<< HEAD
    1. Metadata discovery
    2. Client registration
    3. Preparing authorization
    4. Request authorization and obtain the authorization code
    5. Token request
    6. Authentication complete
+=======
+  1. Metadata discovery
+  2. Client registration
+  3. Preparing authorization
+  4. Request authorization and obtain the authorization code
+  5. Token request
+  6. Authentication complete
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
 
 Once finished, you will receive an access token that lets you securely make authenticated requests to the Tavily Remote MCP server.
 
@@ -559,12 +602,12 @@ After successful OAuth authentication, you can control which API key is used by 
 
 ## Local MCP
 
-### Prerequisites 🔧
+### Prerequisites
 
 Before you begin, ensure you have:
 
 - [Tavily API key](https://app.tavily.com/home)
-  - If you don't have a Tavily API key, you can sign up for a free account [here](https://app.tavily.com/home)
+  - If you don't have a Tavily API key, you can sign up for a free account [on the Tavily website](https://app.tavily.com/home)
 - [Claude Desktop](https://claude.ai/download) or [Cursor](https://cursor.sh)
 - [Node.js](https://nodejs.org/) (v20 or higher)
   - You can verify your Node.js installation by running:
@@ -579,10 +622,10 @@ Before you begin, ensure you have:
 ### Running with NPX
 
 ```bash
-npx -y tavily-mcp@latest 
+npx -y tavily-mcp@latest
 ```
 
-## Default Parameters Configuration ⚙️
+## Default Parameters Configuration
 
 You can set default parameter values for the `tavily-search` tool using the `DEFAULT_PARAMETERS` environment variable. This allows you to configure default search behavior without specifying these parameters in every request.
 
@@ -609,7 +652,166 @@ export DEFAULT_PARAMETERS='{"include_images": true}'
 }
 ```
 
-## Acknowledgments ✨
+## Stripe Payment Integration
+
+The Tavily MCP server includes Stripe payment integration for processing payments. This is useful if you want to integrate payment processing into your AI-powered applications.
+
+### Available Stripe Tools
+
+- `stripe_create_payment_intent` - Create a payment intent for collecting payments
+- `stripe_get_payment_intent` - Retrieve a payment intent by ID
+- `stripe_create_customer` - Create a new Stripe customer
+- `stripe_get_customer` - Retrieve a customer by ID
+- `stripe_list_charges` - List recent charges
+- `stripe_create_checkout_session` - Create a Stripe checkout session
+- `stripe_get_checkout_session` - Retrieve a checkout session
+
+### Configuration
+
+To enable Stripe functionality, set the `STRIPE_SECRET_KEY` environment variable with your Stripe secret key:
+
+```bash
+export STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+```
+
+### Stripe Example Usage
+
+```json
+{
+  "mcpServers": {
+    "tavily-mcp": {
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "your-api-key-here",
+        "STRIPE_SECRET_KEY": "sk_test_your_stripe_secret_key"
+      }
+    }
+  }
+}
+```
+
+> **Security Note:** Never hardcode your Stripe secret key in source code or configuration files that are committed to version control. Always use environment variables.
+
+## Cloudflare MCP Servers
+
+The Tavily MCP server also provides integration with Cloudflare's MCP servers for additional capabilities. These can be added as remote MCP servers to your client configuration.
+
+### Available Cloudflare MCP Servers
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| Observability | `https://observability.mcp.cloudflare.com/mcp` | Monitoring, logs, and metrics |
+| Radar | `https://radar.mcp.cloudflare.com/mcp` | Security analytics and threat data |
+| Browser | `https://browser.mcp.cloudflare.com/mcp` | Web browsing and page rendering |
+
+### Connecting to Cloudflare MCP Servers
+
+#### Claude Desktop
+
+Add Cloudflare MCP servers to your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "cloudflare-observability": {
+      "command": "npx",
+      "args": ["-y", "@cloudflare/mcp-server"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    },
+    "cloudflare-radar": {
+      "command": "npx",
+      "args": ["-y", "@cloudflare/mcp-server"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    },
+    "cloudflare-browser": {
+      "command": "npx",
+      "args": ["-y", "@cloudflare/mcp-server"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+Or using the remote server approach:
+
+```json
+{
+  "mcpServers": {
+    "cloudflare-observability": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://observability.mcp.cloudflare.com/mcp"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    },
+    "cloudflare-radar": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://radar.mcp.cloudflare.com/mcp"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    },
+    "cloudflare-browser": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://browser.mcp.cloudflare.com/mcp"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+#### Cursor
+
+Add Cloudflare MCP servers to your Cursor configuration (`mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "cloudflare-observability": {
+      "command": "npx",
+      "args": ["-y", "@cloudflare/mcp-server"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    },
+    "cloudflare-radar": {
+      "command": "npx",
+      "args": ["-y", "@cloudflare/mcp-server"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    },
+    "cloudflare-browser": {
+      "command": "npx",
+      "args": ["-y", "@cloudflare/mcp-server"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+### Getting a Cloudflare API Token
+
+1. Log in to the [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. Go to Profile > API Tokens
+3. Click "Create Token"
+4. Choose a template or create a custom token
+5. Ensure the token has appropriate permissions for the services you want to use
+
+> **Note:** Some Cloudflare MCP servers may require specific API token permissions. Refer to the Cloudflare MCP server documentation for details.
+
+## Acknowledgments
 
 - [Model Context Protocol](https://modelcontextprotocol.io) for the MCP specification
 - [Anthropic](https://anthropic.com) for Claude Desktop

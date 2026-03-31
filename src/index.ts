@@ -8,6 +8,22 @@ import dotenv from "dotenv";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import {
+  isStripeConfigured,
+  createPaymentIntent,
+  getPaymentIntent,
+  createCustomer,
+  getCustomer,
+  listCharges,
+  createCheckoutSession,
+  getCheckoutSession
+} from './stripe.js';
+
+// Cloudflare imports
+import {
+  CLOUDFLARE_MCP_SERVERS,
+  listCloudflareServers
+} from './cloudflare.js';
 
 dotenv.config();
 
@@ -554,7 +570,7 @@ class TavilyClient {
             required: ["url"]
           }
         },
-        {
+{
           name: "tavily_research",
           description: "Perform comprehensive research on a given topic or question. Use this tool when you need to gather information from multiple sources to answer a question or complete a task. Returns a detailed response based on the research findings. Rate limit: 20 requests per minute.",
           inputSchema: {
@@ -572,6 +588,201 @@ class TavilyClient {
               }
             },
             required: ["input"]
+          }
+        },
+        // Stripe Payment Tools
+        {
+          name: "stripe_create_payment_intent",
+          description: "Create a Stripe payment intent. A payment intent represents your intent to collect payment from a customer. Requires STRIPE_SECRET_KEY environment variable to be set.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              amount: {
+                type: "number",
+                description: "Amount to charge in cents (smallest currency unit). Example: 1000 for $10.00"
+              },
+              currency: {
+                type: "string",
+                description: "Three-letter ISO currency code (e.g., 'usd', 'eur')",
+                default: "usd"
+              },
+              customer: {
+                type: "string",
+                description: "Customer ID to associate with the payment"
+              },
+              description: {
+                type: "string",
+                description: "Description of the payment"
+              },
+              metadata: {
+                type: "object",
+                description: "Additional metadata to store with the payment intent"
+              }
+            },
+            required: ["amount"]
+          }
+        },
+        {
+          name: "stripe_get_payment_intent",
+          description: "Retrieve a Stripe payment intent by its ID. Requires STRIPE_SECRET_KEY environment variable to be set.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              payment_intent_id: {
+                type: "string",
+                description: "The ID of the payment intent to retrieve"
+              }
+            },
+            required: ["payment_intent_id"]
+          }
+        },
+        {
+          name: "stripe_create_customer",
+          description: "Create a new Stripe customer. Requires STRIPE_SECRET_KEY environment variable to be set.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              email: {
+                type: "string",
+                description: "Customer's email address"
+              },
+              name: {
+                type: "string",
+                description: "Customer's name"
+              },
+              metadata: {
+                type: "object",
+                description: "Additional metadata to store with the customer"
+              }
+            },
+            required: ["email"]
+          }
+        },
+        {
+          name: "stripe_get_customer",
+          description: "Retrieve a Stripe customer by ID. Requires STRIPE_SECRET_KEY environment variable to be set.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              customer_id: {
+                type: "string",
+                description: "The ID of the customer to retrieve"
+              }
+            },
+            required: ["customer_id"]
+          }
+        },
+        {
+          name: "stripe_list_charges",
+          description: "List Stripe charges (payments). Requires STRIPE_SECRET_KEY environment variable to be set.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              limit: {
+                type: "number",
+                description: "Maximum number of charges to return",
+                default: 10,
+                maximum: 100
+              },
+              customer: {
+                type: "string",
+                description: "Filter charges by customer ID"
+              }
+            }
+          }
+        },
+        {
+          name: "stripe_create_checkout_session",
+          description: "Create a Stripe checkout session for accepting payments. Requires STRIPE_SECRET_KEY environment variable to be set.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              line_items: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    price_data: {
+                      type: "object",
+                      properties: {
+                        currency: { type: "string" },
+                        product_data: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string" },
+                            description: { type: "string" }
+                          }
+                        },
+                        unit_amount: { type: "number" }
+                      }
+                    },
+                    quantity: { type: "number" }
+                  }
+                },
+                description: "Array of line items for the checkout session"
+              },
+              mode: {
+                type: "string",
+                enum: ["payment", "subscription", "setup"],
+                description: "The mode of the checkout session",
+                default: "payment"
+              },
+              success_url: {
+                type: "string",
+                description: "URL to redirect to after successful payment"
+              },
+              cancel_url: {
+                type: "string",
+                description: "URL to redirect to if payment is cancelled"
+              },
+              customer_email: {
+                type: "string",
+                description: "Customer's email address"
+              },
+              metadata: {
+                type: "object",
+                description: "Additional metadata"
+              }
+            },
+            required: ["success_url", "cancel_url"]
+          }
+        },
+        {
+          name: "stripe_get_checkout_session",
+          description: "Retrieve a Stripe checkout session by ID. Requires STRIPE_SECRET_KEY environment variable to be set.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              session_id: {
+                type: "string",
+                description: "The ID of the checkout session to retrieve"
+              }
+            },
+            required: ["session_id"]
+          }
+        },
+        // Cloudflare MCP Server Tools (Remote Servers)
+        {
+          name: "cloudflare_list_servers",
+          description: "List available Cloudflare MCP servers that can be added to your MCP client. These are remote MCP servers that provide monitoring, analytics, and browsing capabilities.",
+          inputSchema: {
+            type: "object",
+            properties: {}
+          }
+        },
+        {
+          name: "cloudflare_get_server_info",
+          description: "Get connection information for a specific Cloudflare MCP server. Use this to get the server URL and configuration details.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              service: {
+                type: "string",
+                enum: ["observability", "radar", "browser"],
+                description: "The Cloudflare service to get info for"
+              }
+            },
+            required: ["service"]
           }
         },
       ];
@@ -703,8 +914,132 @@ class TavilyClient {
               input: args.input,
               model: args.model
             });
+<<<<<<< HEAD
             result = formatResearchResults(researchResponse);
             break;
+=======
+            return {
+              content: [{
+                type: "text",
+text: formatResearchResults(researchResponse)
+              }]
+            };
+
+          // Stripe payment tool handlers
+          case "stripe_create_payment_intent":
+            if (!isStripeConfigured()) {
+              throw new McpError(ErrorCode.InvalidRequest, "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+            }
+            try {
+              const pi = await createPaymentIntent({
+                amount: args.amount,
+                currency: args.currency,
+                customer: args.customer,
+                description: args.description,
+                metadata: args.metadata
+              });
+              return { content: [{ type: "text", text: formatStripePaymentIntent(pi) }] };
+            } catch (err: any) {
+              return { content: [{ type: "text", text: `Stripe error: ${err.message}` }], isError: true };
+            }
+
+          case "stripe_get_payment_intent":
+            if (!isStripeConfigured()) {
+              throw new McpError(ErrorCode.InvalidRequest, "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+            }
+            try {
+              const pi = await getPaymentIntent(args.payment_intent_id);
+              return { content: [{ type: "text", text: formatStripePaymentIntent(pi) }] };
+            } catch (err: any) {
+              return { content: [{ type: "text", text: `Stripe error: ${err.message}` }], isError: true };
+            }
+
+          case "stripe_create_customer":
+            if (!isStripeConfigured()) {
+              throw new McpError(ErrorCode.InvalidRequest, "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+            }
+            try {
+              const c = await createCustomer({
+                email: args.email,
+                name: args.name,
+                metadata: args.metadata
+              });
+              return { content: [{ type: "text", text: formatStripeCustomer(c) }] };
+            } catch (err: any) {
+              return { content: [{ type: "text", text: `Stripe error: ${err.message}` }], isError: true };
+            }
+
+          case "stripe_get_customer":
+            if (!isStripeConfigured()) {
+              throw new McpError(ErrorCode.InvalidRequest, "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+            }
+            try {
+              const c = await getCustomer(args.customer_id);
+              return { content: [{ type: "text", text: formatStripeCustomer(c) }] };
+            } catch (err: any) {
+              return { content: [{ type: "text", text: `Stripe error: ${err.message}` }], isError: true };
+            }
+
+          case "stripe_list_charges":
+            if (!isStripeConfigured()) {
+              throw new McpError(ErrorCode.InvalidRequest, "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+            }
+            try {
+              const charges = await listCharges(args.limit, args.customer);
+              return { content: [{ type: "text", text: formatStripeCharges(charges) }] };
+            } catch (err: any) {
+              return { content: [{ type: "text", text: `Stripe error: ${err.message}` }], isError: true };
+            }
+
+          case "stripe_create_checkout_session":
+            if (!isStripeConfigured()) {
+              throw new McpError(ErrorCode.InvalidRequest, "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+            }
+            try {
+              const s = await createCheckoutSession({
+                lineItems: args.line_items,
+                mode: args.mode,
+                successUrl: args.success_url,
+                cancelUrl: args.cancel_url,
+                customerEmail: args.customer_email,
+                metadata: args.metadata
+              });
+              return { content: [{ type: "text", text: formatStripeCheckoutSession(s) }] };
+            } catch (err: any) {
+              return { content: [{ type: "text", text: `Stripe error: ${err.message}` }], isError: true };
+            }
+
+          case "stripe_get_checkout_session":
+            if (!isStripeConfigured()) {
+              throw new McpError(ErrorCode.InvalidRequest, "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.");
+            }
+            try {
+              const s = await getCheckoutSession(args.session_id);
+              return { content: [{ type: "text", text: formatStripeCheckoutSession(s) }] };
+            } catch (err: any) {
+              return { content: [{ type: "text", text: `Stripe error: ${err.message}` }], isError: true };
+            }
+
+          // Cloudflare tool handlers
+          case "cloudflare_list_servers":
+            return {
+              content: [{
+                type: "text",
+                text: formatCloudflareServers()
+              }]
+            };
+
+          case "cloudflare_get_server_info":
+            if (!args.service) {
+              throw new McpError(ErrorCode.InvalidRequest, "Service parameter is required. Use 'observability', 'radar', or 'browser'.");
+            }
+            return {
+              content: [{
+                type: "text",
+                text: formatCloudflareServerInfo(args.service)
+              }]
+            };
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
 
           default:
             throw new McpError(
@@ -1090,6 +1425,206 @@ function formatResearchResults(response: TavilyResearchResponse): string {
   }
 
   return response.content || 'No research results available';
+}
+
+// Stripe format functions
+function formatStripePaymentIntent(pi: any): string {
+  const output: string[] = [];
+  output.push('Payment Intent Created:');
+  output.push(`ID: ${pi.id}`);
+  output.push(`Amount: ${pi.amount} ${pi.currency?.toUpperCase()}`);
+  output.push(`Status: ${pi.status}`);
+  if (pi.client_secret) {
+    output.push(`Client Secret: ${pi.client_secret.substring(0, 20)}...`);
+  }
+  if (pi.description) {
+    output.push(`Description: ${pi.description}`);
+  }
+  if (pi.customer) {
+    output.push(`Customer ID: ${pi.customer}`);
+  }
+  if (pi.metadata) {
+    output.push(`Metadata: ${JSON.stringify(pi.metadata)}`);
+  }
+  return output.join('\n');
+}
+
+function formatStripeCustomer(customer: any): string {
+  const output: string[] = [];
+  output.push('Customer:');
+  output.push(`ID: ${customer.id}`);
+  if (customer.email) {
+    output.push(`Email: ${customer.email}`);
+  }
+  if (customer.name) {
+    output.push(`Name: ${customer.name}`);
+  }
+  if (customer.metadata) {
+    output.push(`Metadata: ${JSON.stringify(customer.metadata)}`);
+  }
+  return output.join('\n');
+}
+
+function formatStripeCharges(charges: any): string {
+  const output: string[] = [];
+  output.push(`Found ${charges.data.length} charge(s):`);
+  
+  charges.data.forEach((charge: any, index: number) => {
+    output.push(`\n[${index + 1}] Charge ID: ${charge.id}`);
+    output.push(`    Amount: ${charge.amount} ${charge.currency?.toUpperCase()}`);
+    output.push(`    Status: ${charge.status}`);
+    output.push(`    Created: ${new Date(charge.created * 1000).toISOString()}`);
+    if (charge.customer) {
+      output.push(`    Customer: ${charge.customer}`);
+    }
+    if (charge.description) {
+      output.push(`    Description: ${charge.description}`);
+    }
+  });
+  
+  return output.join('\n');
+}
+
+function formatStripeCheckoutSession(session: any): string {
+  const output: string[] = [];
+  output.push('Checkout Session:');
+  output.push(`ID: ${session.id}`);
+  output.push(`Mode: ${session.mode}`);
+  output.push(`Status: ${session.payment_status}`);
+  if (session.url) {
+    output.push(`URL: ${session.url}`);
+  }
+  if (session.customer_email) {
+    output.push(`Customer Email: ${session.customer_email}`);
+  }
+  if (session.metadata) {
+    output.push(`Metadata: ${JSON.stringify(session.metadata)}`);
+  }
+  return output.join('\n');
+}
+
+// Cloudflare format functions
+function formatCloudflareServers(): string {
+  const output: string[] = [];
+  output.push('Available Cloudflare MCP Servers:');
+  output.push('');
+  output.push('These are remote MCP servers that you can add to your MCP client configuration.');
+  output.push('');
+  
+  const servers = listCloudflareServers();
+  servers.forEach((server, index) => {
+    output.push(`[${index + 1}] ${server.name}`);
+    output.push(`    URL: ${server.url}`);
+    output.push(`    Description: ${server.description}`);
+    output.push('');
+  });
+  
+  output.push('To add these servers to your MCP client, add them to your configuration file:');
+  output.push('');
+  output.push('Claude Desktop (claude_desktop_config.json):');
+  output.push('  "mcpServers": {');
+  output.push('    "cloudflare-observability": {');
+  output.push('      "command": "npx",');
+  output.push('      "args": ["-y", "@cloudflare/mcp-server"],');
+  output.push('      "env": { "CLOUDFLARE_API_TOKEN": "your-api-token" }');
+  output.push('    }');
+  output.push('  }');
+  output.push('');
+  output.push('Or use the remote server approach with the URLs above.');
+  
+  return output.join('\n');
+}
+
+function formatCloudflareServerInfo(service: string): string {
+  const output: string[] = [];
+  
+  const validServices = ['observability', 'radar', 'browser'];
+  if (!validServices.includes(service)) {
+    return `Invalid service: ${service}. Use one of: observability, radar, browser`;
+  }
+  
+  const serverUrl = CLOUDFLARE_MCP_SERVERS[service as keyof typeof CLOUDFLARE_MCP_SERVERS];
+  
+  output.push(`Cloudflare ${service.charAt(0).toUpperCase() + service.slice(1)} MCP Server:`);
+  output.push(`Server URL: ${serverUrl}`);
+  output.push('');
+  output.push('To connect to this server:');
+  output.push('');
+  output.push('1. Add the following to your MCP client configuration:');
+  
+  if (service === 'observability') {
+    output.push('   Claude Desktop:');
+    output.push('   {');
+    output.push('     "mcpServers": {');
+    output.push('       "cloudflare-observability": {');
+    output.push('         "command": "npx",');
+    output.push('         "args": ["-y", "@cloudflare/mcp-server"],');
+    output.push('         "env": { "CLOUDFLARE_API_TOKEN": "your-api-token" }');
+    output.push('       }');
+    output.push('     }');
+    output.push('   }');
+    output.push('');
+    output.push('   Or use remote server:');
+    output.push('   {');
+    output.push('     "mcpServers": {');
+    output.push('       "cloudflare-observability": {');
+    output.push('         "command": "npx",');
+    output.push('         "args": ["-y", "mcp-remote", "https://observability.mcp.cloudflare.com/mcp"],');
+    output.push('         "env": { "CLOUDFLARE_API_TOKEN": "your-api-token" }');
+    output.push('       }');
+    output.push('     }');
+    output.push('   }');
+  } else if (service === 'radar') {
+    output.push('   Claude Desktop:');
+    output.push('   {');
+    output.push('     "mcpServers": {');
+    output.push('       "cloudflare-radar": {');
+    output.push('         "command": "npx",');
+    output.push('         "args": ["-y", "@cloudflare/mcp-server"],');
+    output.push('         "env": { "CLOUDFLARE_API_TOKEN": "your-api-token" }');
+    output.push('       }');
+    output.push('     }');
+    output.push('   }');
+    output.push('');
+    output.push('   Or use remote server:');
+    output.push('   {');
+    output.push('     "mcpServers": {');
+    output.push('       "cloudflare-radar": {');
+    output.push('         "command": "npx",');
+    output.push('         "args": ["-y", "mcp-remote", "https://radar.mcp.cloudflare.com/mcp"],');
+    output.push('         "env": { "CLOUDFLARE_API_TOKEN": "your-api-token" }');
+    output.push('       }');
+    output.push('     }');
+    output.push('   }');
+  } else if (service === 'browser') {
+    output.push('   Claude Desktop:');
+    output.push('   {');
+    output.push('     "mcpServers": {');
+    output.push('       "cloudflare-browser": {');
+    output.push('         "command": "npx",');
+    output.push('         "args": ["-y", "@cloudflare/mcp-server"],');
+    output.push('         "env": { "CLOUDFLARE_API_TOKEN": "your-api-token" }');
+    output.push('       }');
+    output.push('     }');
+    output.push('   }');
+    output.push('');
+    output.push('   Or use remote server:');
+    output.push('   {');
+    output.push('     "mcpServers": {');
+    output.push('       "cloudflare-browser": {');
+    output.push('         "command": "npx",');
+    output.push('         "args": ["-y", "mcp-remote", "https://browser.mcp.cloudflare.com/mcp"],');
+    output.push('         "env": { "CLOUDFLARE_API_TOKEN": "your-api-token" }');
+    output.push('       }');
+    output.push('     }');
+    output.push('   }');
+  }
+  
+  output.push('');
+  output.push('2. Replace "your-api-token" with your Cloudflare API token.');
+  output.push('   Get your token from: https://dash.cloudflare.com/profile/api-tokens');
+  
+  return output.join('\n');
 }
 
 function listTools(): void {

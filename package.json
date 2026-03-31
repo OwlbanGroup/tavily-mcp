@@ -48,8 +48,13 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
     "axios": "^1.6.7",
+<<<<<<< HEAD
     "dotenv": "^16.4.5",
     "yargs": "^17.7.2"
+=======
+    "yargs": "^17.7.2",
+    "stripe": "^14.14.0"
+>>>>>>> 69b9774f592959b988b148e3f97de1f739d4ec16
   },
   "devDependencies": {
     "@types/node": "^20.19.37",
