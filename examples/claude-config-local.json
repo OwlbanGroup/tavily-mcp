@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "tavily": {
+      "command": "node",
+      "args": [
+        "/path/to/tavily-mcp/build/index.js"
+      ],
+      "env": {
+        "TAVILY_API_KEY": "your-api-key-here",
+        "DEBUG": "false",
+        "CACHE_TTL": "300000",
+        "MAX_CACHE_SIZE": "100",
+        "RATE_LIMIT_DISABLED": "false",
+        "RATE_LIMIT_REQUESTS": "100",
+        "RATE_LIMIT_WINDOW": "60000",
+        "API_TIMEOUT": "30000"
+      }
+    }
+  }
+}

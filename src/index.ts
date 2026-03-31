@@ -3,7 +3,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {CallToolRequestSchema, ListToolsRequestSchema, Tool} from "@modelcontextprotocol/sdk/types.js";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import dotenv from "dotenv";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import yargs from 'yargs';
@@ -12,6 +12,117 @@ import { hideBin } from 'yargs/helpers';
 dotenv.config();
 
 const API_KEY = process.env.TAVILY_API_KEY;
+
+// Enhanced logging utility
+interface LogEntry {
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
+  message: string;
+  data?: any;
+}
+
+class Logger {
+  private enableDebug = process.env.DEBUG === 'true';
+
+  log(level: LogEntry['level'], message: string, data?: any): void {
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      ...(data && { data })
+    };
+    
+    const prefix = `[${entry.timestamp}] [${level}]`;
+    const logMessage = data ? `${prefix} ${message}` : `${prefix} ${message}`;
+    
+    if (level === 'ERROR') {
+      console.error(logMessage, data || '');
+    } else if (level === 'WARN') {
+      console.warn(logMessage, data || '');
+    } else if (level === 'DEBUG' && this.enableDebug) {
+      console.log(logMessage, data || '');
+    } else if (level === 'INFO') {
+      console.error(logMessage, data || '');
+    }
+  }
+
+  info(message: string, data?: any): void { this.log('INFO', message, data); }
+  warn(message: string, data?: any): void { this.log('WARN', message, data); }
+  error(message: string, data?: any): void { this.log('ERROR', message, data); }
+  debug(message: string, data?: any): void { this.log('DEBUG', message, data); }
+}
+
+const logger = new Logger();
+
+// Rate limiting and caching
+class RequestCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private ttl = parseInt(process.env.CACHE_TTL || '300000', 10); // 5 minutes default
+  private maxSize = parseInt(process.env.MAX_CACHE_SIZE || '100', 10);
+
+  set(key: string, data: any): void {
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { data, timestamp: Date.now() });
+    logger.debug(`Cache set: ${key}`);
+  }
+
+  get(key: string): any | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    if (Date.now() - entry.timestamp > this.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    logger.debug(`Cache hit: ${key}`);
+    return entry.data;
+  }
+
+  clear(): void {
+    this.cache.clear();
+    logger.info('Cache cleared');
+  }
+}
+
+class RateLimiter {
+  private requestCounts = new Map<string, number[]>();
+  private maxRequests = parseInt(process.env.RATE_LIMIT_REQUESTS || '100', 10);
+  private windowMs = parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10); // 1 minute
+
+  async checkLimit(endpoint: string): Promise<boolean> {
+    const now = Date.now();
+    const window = now - this.windowMs;
+    
+    const requests = this.requestCounts.get(endpoint) || [];
+    const recentRequests = requests.filter(time => time > window);
+    
+    if (recentRequests.length >= this.maxRequests) {
+      logger.warn(`Rate limit exceeded for ${endpoint}`);
+      return false;
+    }
+    
+    recentRequests.push(now);
+    this.requestCounts.set(endpoint, recentRequests);
+    return true;
+  }
+
+  getStatus(endpoint: string): { used: number; limit: number; resetIn: number } {
+    const requests = this.requestCounts.get(endpoint) || [];
+    const window = Date.now() - this.windowMs;
+    const recentRequests = requests.filter(time => time > window);
+    const resetTime = Math.max(...recentRequests) + this.windowMs || Date.now() + this.windowMs;
+    
+    return {
+      used: recentRequests.length,
+      limit: this.maxRequests,
+      resetIn: Math.max(0, resetTime - Date.now())
+    };
+  }
+}
 
 
 interface TavilyResponse {
@@ -61,6 +172,8 @@ class TavilyClient {
   // Core client properties
   private server: Server;
   private axiosInstance;
+  private cache = new RequestCache();
+  private rateLimiter = new RateLimiter();
   private baseURLs = {
     search: 'https://api.tavily.com/search',
     extract: 'https://api.tavily.com/extract',
@@ -96,21 +209,38 @@ class TavilyClient {
         'content-type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`,
         'X-Client-Source': 'MCP'
-      }
+      },
+      timeout: parseInt(process.env.API_TIMEOUT || '30000', 10)
     });
 
     this.setupHandlers();
     this.setupErrorHandling();
+    
+    logger.info('Tavily MCP Server initialized', { 
+      apiKeyPresent: !!API_KEY,
+      cacheEnabled: process.env.CACHE_TTL !== '0',
+      rateLimitingEnabled: process.env.RATE_LIMIT_DISABLED !== 'true'
+    });
   }
 
   private setupErrorHandling(): void {
     this.server.onerror = (error: any) => {
-      console.error("[MCP Error]", error);
+      logger.error("MCP Error", error);
     };
 
     process.on('SIGINT', async () => {
+      logger.info('Shutting down server...');
       await this.server.close();
       process.exit(0);
+    });
+
+    process.on('unhandledRejection', (reason: any) => {
+      logger.error('Unhandled rejection', reason);
+    });
+
+    process.on('uncaughtException', (error: any) => {
+      logger.error('Uncaught exception', error);
+      process.exit(1);
     });
   }
 
@@ -135,15 +265,36 @@ class TavilyClient {
       const defaults = JSON.parse(parametersEnv);
       
       if (typeof defaults !== 'object' || defaults === null || Array.isArray(defaults)) {
-        console.warn(`DEFAULT_PARAMETERS is not a valid JSON object: ${parametersEnv}`);
+        logger.warn(`DEFAULT_PARAMETERS is not a valid JSON object: ${parametersEnv}`);
         return {};
       }
       
       return defaults;
     } catch (error: any) {
-      console.warn(`Failed to parse DEFAULT_PARAMETERS as JSON: ${error.message}`);
+      logger.warn(`Failed to parse DEFAULT_PARAMETERS as JSON: ${error.message}`);
       return {};
     }
+  }
+
+  private generateCacheKey(toolName: string, params: any): string | null {
+    // Don't cache research or crawl operations due to their dynamic nature
+    if (toolName === 'tavily_research' || toolName === 'tavily_crawl') {
+      return null;
+    }
+    
+    // Create a deterministic cache key from tool name and parameters
+    const paramStr = JSON.stringify(params);
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${toolName}:${paramStr}`);
+    
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      hash = ((hash << 5) - hash) + data[i];
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    return `${toolName}:${Math.abs(hash)}`;
   }
 
   private setupHandlers(): void {
@@ -436,11 +587,48 @@ class TavilyClient {
         );
       }
 
+      const toolName = request.params.name;
+      
+      // Check rate limiting if enabled
+      if (process.env.RATE_LIMIT_DISABLED !== 'true') {
+        const canProceed = await this.rateLimiter.checkLimit(toolName);
+        if (!canProceed) {
+          const status = this.rateLimiter.getStatus(toolName);
+          return {
+            content: [{
+              type: "text",
+              text: `Rate limit exceeded for ${toolName}. Please wait ${status.resetIn}ms before retrying.`
+            }],
+            isError: true,
+          };
+        }
+      }
+
       try {
         let response: TavilyResponse;
         const args = request.params.arguments ?? {};
+        
+        // Generate cache key based on tool and params (skip for non-cacheable operations)
+        const cacheKey = this.generateCacheKey(toolName, args);
+        const skipCache = toolName === 'tavily_research' || process.env.CACHE_TTL === '0';
+        
+        // Check cache for search operations
+        if (!skipCache && cacheKey) {
+          const cachedResponse = this.cache.get(cacheKey);
+          if (cachedResponse) {
+            logger.info(`Cache hit for ${toolName}`);
+            return {
+              content: [{
+                type: "text",
+                text: cachedResponse
+              }]
+            };
+          }
+        }
 
-        switch (request.params.name) {
+        let result: any;
+
+        switch (toolName) {
           case "tavily_search":
             // If country is set, ensure topic is general
             if (args.country) {
@@ -463,6 +651,7 @@ class TavilyClient {
               start_date: args.start_date,
               end_date: args.end_date
             });
+            result = formatResults(response);
             break;
           
           case "tavily_extract":
@@ -474,6 +663,7 @@ class TavilyClient {
               include_favicon: args.include_favicon,
               query: args.query,
             });
+            result = formatResults(response);
             break;
 
           case "tavily_crawl":
@@ -491,12 +681,8 @@ class TavilyClient {
               include_favicon: args.include_favicon,
               chunks_per_source: 3,
             });
-            return {
-              content: [{
-                type: "text",
-                text: formatCrawlResults(crawlResponse)
-              }]
-            };
+            result = formatCrawlResults(crawlResponse);
+            break;
 
           case "tavily_map":
             const mapResponse = await this.map({
@@ -509,48 +695,48 @@ class TavilyClient {
               select_domains: Array.isArray(args.select_domains) ? args.select_domains : [],
               allow_external: args.allow_external
             });
-            return {
-              content: [{
-                type: "text",
-                text: formatMapResults(mapResponse)
-              }]
-            };
+            result = formatMapResults(mapResponse);
+            break;
 
           case "tavily_research":
             const researchResponse = await this.research({
               input: args.input,
               model: args.model
             });
-            return {
-              content: [{
-                type: "text",
-                text: formatResearchResults(researchResponse)
-              }]
-            };
+            result = formatResearchResults(researchResponse);
+            break;
 
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
-              `Unknown tool: ${request.params.name}`
+              `Unknown tool: ${toolName}`
             );
+        }
+
+        // Cache result if applicable
+        if (!skipCache && cacheKey) {
+          this.cache.set(cacheKey, result);
         }
 
         return {
           content: [{
             type: "text",
-            text: formatResults(response)
+            text: result
           }]
         };
       } catch (error: any) {
         if (axios.isAxiosError(error)) {
-          const toolName = request.params.name?.replace('tavily_', '') || '';
-          const docsUrl = this.docsURLs[toolName] || '';
+          const toolNamePart = toolName?.replace('tavily_', '') || '';
+          const docsUrl = this.docsURLs[toolNamePart] || '';
           const responseData = error.response?.data;
           const detail = responseData && typeof responseData === 'object'
             ? (responseData.detail || responseData.message || responseData)
             : (error.message);
           const detailStr = typeof detail === 'object' ? JSON.stringify(detail) : String(detail);
           const docsSuffix = docsUrl ? `\nDocumentation: ${docsUrl}` : '';
+          
+          logger.error(`Tavily API error for ${toolName}`, { status: error.response?.status, detail: detailStr });
+          
           return {
             content: [{
               type: "text",
@@ -559,6 +745,8 @@ class TavilyClient {
             isError: true,
           }
         }
+        
+        logger.error(`Error processing tool ${toolName}`, error);
         throw error;
       }
     });
@@ -566,9 +754,23 @@ class TavilyClient {
 
 
   async run(): Promise<void> {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.error("Tavily MCP server running on stdio");
+    try {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      logger.info("Tavily MCP server running on stdio");
+      
+      // Log startup configuration
+      const config = {
+        logLevel: process.env.DEBUG === 'true' ? 'DEBUG' : 'INFO',
+        cacheTTL: process.env.CACHE_TTL || '300000',
+        rateLimiting: process.env.RATE_LIMIT_DISABLED === 'true' ? 'disabled' : 'enabled',
+        apiTimeout: process.env.API_TIMEOUT || '30000'
+      };
+      logger.info("Server configuration", config);
+    } catch (error) {
+      logger.error("Failed to start server", error);
+      throw error;
+    }
   }
 
   async search(params: any): Promise<TavilyResponse> {
@@ -621,65 +823,95 @@ class TavilyClient {
         }
       }
       
+      logger.debug(`Search request for query: ${cleanedParams.query}`, { params: cleanedParams });
       const response = await this.axiosInstance.post(endpoint, cleanedParams);
+      logger.info(`Search successful for query: ${cleanedParams.query}`, { 
+        resultCount: response.data.results?.length || 0 
+      });
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 401) {
-        throw new Error(`Invalid API key. Documentation: ${this.docsURLs.search}`);
+        const msg = `Invalid API key. Documentation: ${this.docsURLs.search}`;
+        logger.error(msg);
+        throw new Error(msg);
       } else if (error.response?.status === 429) {
-        throw new Error(`Usage limit exceeded. Documentation: ${this.docsURLs.search}`);
+        const msg = `Usage limit exceeded. Documentation: ${this.docsURLs.search}`;
+        logger.warn(msg);
+        throw new Error(msg);
       }
+      logger.error(`Search error for query: ${params.query}`, error);
       throw error;
     }
   }
 
   async extract(params: any): Promise<TavilyResponse> {
     try {
+      logger.debug(`Extract request for URLs`, { urlCount: params.urls?.length || 0 });
       const response = await this.axiosInstance.post(this.baseURLs.extract, {
         ...params,
         api_key: API_KEY
       });
+      logger.info(`Extract successful for ${params.urls?.length || 0} URLs`);
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 401) {
-        throw new Error(`Invalid API key. Documentation: ${this.docsURLs.extract}`);
+        const msg = `Invalid API key. Documentation: ${this.docsURLs.extract}`;
+        logger.error(msg);
+        throw new Error(msg);
       } else if (error.response?.status === 429) {
-        throw new Error(`Usage limit exceeded. Documentation: ${this.docsURLs.extract}`);
+        const msg = `Usage limit exceeded. Documentation: ${this.docsURLs.extract}`;
+        logger.warn(msg);
+        throw new Error(msg);
       }
+      logger.error(`Extract error`, error);
       throw error;
     }
   }
 
   async crawl(params: any): Promise<TavilyCrawlResponse> {
     try {
+      logger.debug(`Crawl request for URL: ${params.url}`, { maxDepth: params.max_depth });
       const response = await this.axiosInstance.post(this.baseURLs.crawl, {
         ...params,
         api_key: API_KEY
       });
+      logger.info(`Crawl successful for ${params.url}`, { pageCount: response.data.results?.length || 0 });
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 401) {
-        throw new Error(`Invalid API key. Documentation: ${this.docsURLs.crawl}`);
+        const msg = `Invalid API key. Documentation: ${this.docsURLs.crawl}`;
+        logger.error(msg);
+        throw new Error(msg);
       } else if (error.response?.status === 429) {
-        throw new Error(`Usage limit exceeded. Documentation: ${this.docsURLs.crawl}`);
+        const msg = `Usage limit exceeded. Documentation: ${this.docsURLs.crawl}`;
+        logger.warn(msg);
+        throw new Error(msg);
       }
+      logger.error(`Crawl error for ${params.url}`, error);
       throw error;
     }
   }
 
   async map(params: any): Promise<TavilyMapResponse> {
     try {
+      logger.debug(`Map request for URL: ${params.url}`, { maxDepth: params.max_depth });
       const response = await this.axiosInstance.post(this.baseURLs.map, {
         ...params,
         api_key: API_KEY
       });
+      logger.info(`Map successful for ${params.url}`, { urlCount: response.data.results?.length || 0 });
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 401) {
-        throw new Error(`Invalid API key. Documentation: ${this.docsURLs.map}`);
+        const msg = `Invalid API key. Documentation: ${this.docsURLs.map}`;
+        logger.error(msg);
+        throw new Error(msg);
       } else if (error.response?.status === 429) {
-        throw new Error(`Usage limit exceeded. Documentation: ${this.docsURLs.map}`);
+        const msg = `Usage limit exceeded. Documentation: ${this.docsURLs.map}`;
+        logger.warn(msg);
+        throw new Error(msg);
       }
+      logger.error(`Map error for ${params.url}`, error);
       throw error;
     }
   }
@@ -692,6 +924,7 @@ class TavilyClient {
     const MAX_MINI_MODEL_POLL_DURATION = 300000; // 5 minutes in ms
 
     try {
+      logger.debug(`Research request for input: ${params.input?.substring(0, 50)}...`, { model: params.model });
       const response = await this.axiosInstance.post(this.baseURLs.research, {
         input: params.input,
         model: params.model || 'auto',
@@ -700,8 +933,12 @@ class TavilyClient {
 
       const requestId = response.data.request_id;
       if (!requestId) {
-        return { error: `No request_id returned from research endpoint. Documentation: ${this.docsURLs.research}` };
+        const msg = `No request_id returned from research endpoint. Documentation: ${this.docsURLs.research}`;
+        logger.error(msg);
+        return { error: msg };
       }
+
+      logger.info(`Research task started`, { requestId, model: params.model });
 
       // For model=auto, use pro timeout since we don't know which model will be used
       const maxPollDuration = params.model === 'mini'
@@ -724,17 +961,23 @@ class TavilyClient {
 
           if (status === 'completed') {
             const content = pollResponse.data.content;
+            logger.info(`Research task completed`, { requestId });
             return {
               content: content || ''
             };
           }
 
           if (status === 'failed') {
-            return { error: `Research task failed. Documentation: ${this.docsURLs.research}` };
+            const msg = `Research task failed. Documentation: ${this.docsURLs.research}`;
+            logger.error(msg, { requestId });
+            return { error: msg };
           }
+
+          logger.debug(`Research task in progress`, { requestId, status });
 
         } catch (pollError: any) {
           if (pollError.response?.status === 404) {
+            logger.warn(`Research task not found`, { requestId });
             return { error: 'Research task not found' };
           }
           throw pollError;
@@ -743,13 +986,20 @@ class TavilyClient {
         pollInterval = Math.min(pollInterval * POLL_BACKOFF_FACTOR, MAX_POLL_INTERVAL);
       }
 
-      return { error: `Research task timed out. Documentation: ${this.docsURLs.research}` };
+      const msg = `Research task timed out. Documentation: ${this.docsURLs.research}`;
+      logger.error(msg, { requestId, elapsed: totalElapsed });
+      return { error: msg };
     } catch (error: any) {
       if (error.response?.status === 401) {
-        throw new Error(`Invalid API key. Documentation: ${this.docsURLs.research}`);
+        const msg = `Invalid API key. Documentation: ${this.docsURLs.research}`;
+        logger.error(msg);
+        throw new Error(msg);
       } else if (error.response?.status === 429) {
-        throw new Error(`Usage limit exceeded. Documentation: ${this.docsURLs.research}`);
+        const msg = `Usage limit exceeded. Documentation: ${this.docsURLs.research}`;
+        logger.warn(msg);
+        throw new Error(msg);
       }
+      logger.error(`Research error`, error);
       throw error;
     }
   }

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  tavily-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tavily-mcp
+    environment:
+      NODE_ENV: production
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      DEBUG: ${DEBUG:-false}
+      CACHE_TTL: ${CACHE_TTL:-300000}
+      MAX_CACHE_SIZE: ${MAX_CACHE_SIZE:-100}
+      RATE_LIMIT_DISABLED: ${RATE_LIMIT_DISABLED:-false}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60000}
+      API_TIMEOUT: ${API_TIMEOUT:-30000}
+      DEFAULT_PARAMETERS: ${DEFAULT_PARAMETERS}
+    ports:
+      - "${MCP_PORT:-3000}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('healthy')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - tavily-network
+    labels:
+      - "com.tavily.version=0.2.18"
+      - "com.tavily.service=mcp-server"
+
+networks:
+  tavily-network:
+    driver: bridge
+
+# Usage:
+# 1. Create .env file with your configuration
+# 2. Run: docker-compose up -d
+# 3. View logs: docker-compose logs -f tavily-mcp
