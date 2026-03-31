@@ -229,11 +229,13 @@ async function main(): Promise<void> {
   console.log('=========================================');
 }
 
-// Run examples with top-level await
-try {
-  await main();
-} catch (error: unknown) {
-  const err = error instanceof Error ? error : new Error(String(error));
-  console.error(err);
-  process.exit(1);
-}
+// Run examples with async IIFE
+(async () => {
+  try {
+    await main();
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error(err);
+    process.exit(1);
+  }
+})();
